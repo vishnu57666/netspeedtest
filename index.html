@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Speedtest by Ookla - The Global Broadband Speed Test</title>
+    <style>
+        /* --- CORE UI CLONE STYLES --- */
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --bg-main: #141526;
+            --cyan: #00e5ff;
+            --dark-blue: #1e223d;
+            --text-light: #ffffff;
+            --text-dim: #8b90b2;
+            --yellow: #ffd000;
+            --danger: #ff3333;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; user-select: none; }
+        
+        body, html { 
+            background-color: var(--bg-main); color: var(--text-light); 
+            height: 100vh; width: 100vw; overflow: hidden; perspective: 1000px;
+        }
+
+        .hidden { display: none !important; }
+
+        /* --- 3D PARALLAX CONTAINER --- */
+        #app-container {
+            width: 100%; height: 100%; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center;
+            transform-style: preserve-3d; transition: transform 0.1s ease-out;
+        }
+
+        /* --- TOP HEADER & METRICS --- */
+        .header { text-align: center; margin-bottom: 30px; transform: translateZ(20px); }
+        .logo { font-size: 14px; font-weight: 600; letter-spacing: 2px; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .logo svg { width: 16px; fill: var(--text-dim); }
+
+        .top-metrics { display: flex; gap: 40px; justify-content: center; margin-top: 20px; }
+        .metric-col { text-align: center; }
+        .metric-title { font-size: 12px; font-weight: 700; color: var(--text-dim); display: flex; align-items: center; gap: 5px; }
+        .metric-title.active { color: var(--text-light); }
+        .metric-title svg { width: 14px; fill: currentColor; }
+        .metric-line { height: 2px; width: 40px; background: var(--text-dim); margin: 8px auto 0; border-radius: 2px; }
+        .metric-line.active { background: var(--cyan); }
+
+        .sub-metrics { display: flex; gap: 30px; justify-content: center; margin-top: 20px; font-size: 15px; font-weight: 500; transform: translateZ(30px); }
+        .sub-metrics span { color: var(--text-dim); font-size: 12px; margin-left: 2px; }
+        .val-ping { color: var(--text-light); }
+        .val-down { color: var(--cyan); }
+        .val-up { color: var(--text-dim); }
+
+        /* --- GAUGE DESIGN --- */
+        .gauge-container {
+            position: relative; width: 350px; height: 350px; margin: 40px 0;
+            transform: translateZ(50px); cursor: pointer;
+        }
+        .gauge-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%; border: 20px solid var(--dark-blue);
+            border-bottom-color: transparent; transform: rotate(45deg);
+        }
+        .gauge-active {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%; border: 20px solid var(--cyan);
+            border-bottom-color: transparent; transform: rotate(-135deg);
+            clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 100%, 0 100%, 0 50%);
+            transition: transform 0.1s linear;
+        }
+        
+        .gauge-numbers { position: absolute; width: 100%; height: 100%; font-weight: 700; font-size: 14px; color: var(--text-dim); }
+        .num { position: absolute; transform-origin: center; width: 30px; text-align: center; }
+        .n-0 { bottom: 40px; left: 50px; } .n-5 { top: 220px; left: 30px; } .n-10 { top: 150px; left: 25px; color: #fff;}
+        .n-50 { top: 60px; left: 70px; } .n-100 { top: 20px; left: 160px; } .n-250 { top: 60px; right: 70px; }
+        .n-500 { top: 150px; right: 25px; } .n-750 { top: 220px; right: 30px; } .n-1000 { bottom: 40px; right: 40px; }
+
+        .needle {
+            position: absolute; top: 50%; left: 50%; width: 120px; height: 4px;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 80%, #fff 100%);
+            transform-origin: 0 50%; transform: rotate(-135deg);
+            transition: transform 0.1s linear; filter: drop-shadow(0 0 5px var(--cyan));
+        }
+
+        .center-readout {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center;
+        }
+        .center-readout h1 { font-size: 55px; font-weight: 300; letter-spacing: -2px; }
+        .center-readout p { color: var(--text-dim); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: -5px; }
+        
+        #btn-start-overlay { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 10; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 700; color: var(--cyan); text-shadow: 0 0 20px rgba(0,229,255,0.5); background: rgba(20,21,38,0.8); backdrop-filter: blur(2px); transition: 0.3s; }
+        #btn-start-overlay:hover { transform: scale(1.05); color: #fff; }
+
+        /* --- BOTTOM INFO --- */
+        .bottom-info { display: flex; justify-content: space-between; width: 350px; transform: translateZ(20px); margin-top: 20px; }
+        .info-block { display: flex; align-items: center; gap: 10px; }
+        .icon-circle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--text-dim); display: flex; align-items: center; justify-content: center; }
+        .icon-circle svg { width: 14px; fill: var(--text-dim); }
+        .info-text h3 { font-size: 15px; font-weight: 600; }
+        .info-text p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+        /* --- HACK & DEATH SCREENS --- */
+        #hack-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 50; padding: 20px; font-family: monospace; font-size: 14px; color: var(--cyan); text-shadow: 0 0 5px var(--cyan); display: flex; flex-direction: column; justify-content: flex-end; }
+        .log-red { color: var(--danger); text-shadow: 0 0 5px var(--danger); font-weight: bold; }
+        
+        #death-screen { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 100; cursor: none; }
+        .win-bsod { background: #0078D7; color: white; padding: 8%; height: 100%; font-family: "Segoe UI", sans-serif; }
+        .win-bsod h1 { font-size: 120px; margin-bottom: 20px; font-weight: 400; }
+        .win-bsod h2 { font-size: 26px; font-weight: 400; margin-bottom: 20px; }
+        .mac-panic { background: #000; color: #fff; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .mobile-wipe { background: #000; color: #fff; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { border: 3px solid #333; border-top: 3px solid #fff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* --- 3D APRIL FOOL REVEAL --- */
+        #reveal-screen { position: absolute; top:0; left:0; width:100%; height:100%; background: #0a0a0a; z-index: 200; display: flex; align-items: center; justify-content: center; perspective: 1000px; overflow: hidden; }
+        .cube-container { width: 300px; height: 100px; transform-style: preserve-3d; animation: float3d 6s infinite ease-in-out; }
+        .text-3d { font-size: 80px; font-weight: 900; text-transform: uppercase; transform-style: preserve-3d; transform: rotateX(15deg) rotateY(-20deg); text-align: center; line-height: 0.9;}
+        .layer { position: absolute; top: 0; left: 0; color: transparent; -webkit-text-stroke: 1px var(--cyan); }
+        .layer:nth-child(1) { transform: translateZ(0px); color: #fff; -webkit-text-stroke: 0; text-shadow: 0 0 20px var(--cyan); }
+        .layer:nth-child(2) { transform: translateZ(-10px); -webkit-text-stroke-color: #00b3cc; }
+        .layer:nth-child(3) { transform: translateZ(-20px); -webkit-text-stroke-color: #008099; }
+        .layer:nth-child(4) { transform: translateZ(-30px); -webkit-text-stroke-color: #004d66; }
+        .layer:nth-child(5) { transform: translateZ(-40px); -webkit-text-stroke-color: #001a22; }
+        @keyframes float3d { 0%, 100% { transform: translateY(-20px) rotateX(10deg) rotateY(-15deg); } 50% { transform: translateY(20px) rotateX(-5deg) rotateY(15deg); } }
+        
+        .glitch { animation: shake 0.2s infinite; }
+        @keyframes shake { 0% { transform: translate(2px, 1px) rotate(0deg); } 50% { transform: translate(-1px, -2px) rotate(-1deg); } 100% { transform: translate(-3px, 0px) rotate(1deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+                SPEEDTEST
+            </div>
+            
+            <div class="top-metrics">
+                <div class="metric-col">
+                    <div class="metric-title active" id="title-down">
+                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> DOWNLOAD <span style="font-weight:400; font-size:10px; margin-left:4px;">Mbps</span>
+                    </div>
+                    <div class="metric-line active" id="line-down"></div>
+                </div>
+                <div class="metric-col">
+                    <div class="metric-title" id="title-up">
+                        <svg viewBox="0 0 24 24"><path d="M9 15h4v6h2v-6h4l-7-7-7 7zM5 18v2h14v-2H5z"/></svg> UPLOAD <span style="font-weight:400; font-size:10px; margin-left:4px;">Mbps</span>
+                    </div>
+                    <div class="metric-line" id="line-up"></div>
+                </div>
+            </div>
+
+            <div class="sub-metrics">
+                <div>Ping<span>ms</span> &nbsp;<svg width="12" viewBox="0 0 24 24" style="fill:var(--yellow); vertical-align:middle;"><path d="M12 2L2 22h20L12 2z"/></svg> <span class="val-ping" id="sub-ping">--</span></div>
+                <div><svg width="12" viewBox="0 0 24 24" style="fill:var(--cyan); vertical-align:middle;"><path d="M19 9h-4V3H9v6H5l7 7 7-7z"/></svg> <span class="val-down" id="sub-down">--</span></div>
+                <div><svg width="12" viewBox="0 0 24 24" style="fill:var(--text-dim); vertical-align:middle;"><path d="M9 15h4v6h2v-6h4l-7-7-7 7z"/></svg> <span class="val-up" id="sub-up">--</span></div>
+            </div>
+        </div>
+
+        <div class="gauge-container" id="gauge">
+            <div id="btn-start-overlay" onclick="startTest()">GO</div>
+            <div class="gauge-bg"></div>
+            <div class="gauge-active" id="arc"></div>
+            
+            <div class="gauge-numbers">
+                <div class="num n-0">0</div><div class="num n-5">5</div><div class="num n-10">10</div>
+                <div class="num n-50">50</div><div class="num n-100">100</div><div class="num n-250">250</div>
+                <div class="num n-500">500</div><div class="num n-750">750</div><div class="num n-1000">1000</div>
+            </div>
+
+            <div class="needle" id="needle"></div>
+
+            <div class="center-readout">
+                <h1 id="main-readout">--</h1>
+                <p id="main-unit"><svg viewBox="0 0 24 24" width="12" fill="var(--cyan)"><path d="M19 9h-4V3H9v6H5l7 7 7-7z"/></svg> Mbps</p>
+            </div>
+        </div>
+
+        <div class="bottom-info">
+            <div class="info-block">
+                <div class="icon-circle"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+                <div class="info-text">
+                    <h3 id="ui-isp">Loading...</h3>
+                    <p id="ui-ip">Detecting IP</p>
+                </div>
+            </div>
+            <div class="info-block" style="text-align: right; flex-direction: row-reverse;">
+                <div class="icon-circle"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div>
+                <div class="info-text">
+                    <h3 id="ui-isp-host">Provider</h3>
+                    <p id="ui-city">Server Location</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="hack-overlay" class="hidden">
+        <div id="hack-logs"></div>
+    </div>
+
+    <div id="death-screen" class="hidden"></div>
+
+    <div id="reveal-screen" class="hidden">
+        <div class="cube-container" onclick="location.reload()">
+            <div class="text-3d">
+                <div class="layer">APRIL<br>FOOLS</div>
+                <div class="layer">APRIL<br>FOOLS</div>
+                <div class="layer">APRIL<br>FOOLS</div>
+                <div class="layer">APRIL<br>FOOLS</div>
+                <div class="layer">APRIL<br>FOOLS</div>
+            </div>
+            <p style="color:#666; font-family:sans-serif; text-align:center; transform: translateZ(50px); margin-top: 40px; font-size: 14px;">System Integrity Normal. Click to reset.</p>
+        </div>
+    </div>
+
+   <script>
+        // --- 0. SOUND SYSTEM ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        const playSound = (type) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'ping') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'switch') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'alarm') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(1000, now);
+                osc.frequency.setValueAtTime(1200, now + 0.25);
+                osc.frequency.setValueAtTime(1000, now + 0.5);
+                osc.frequency.setValueAtTime(1200, now + 0.75);
+                osc.frequency.setValueAtTime(1000, now + 1.0);
+                osc.frequency.setValueAtTime(1200, now + 1.25);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 1.5);
+                osc.start(now);
+                osc.stop(now + 1.5);
+            } else if (type === 'typing') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800 + Math.random() * 400, now);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 1.5);
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                osc.start(now);
+                osc.stop(now + 1.5);
+            } else if (type === 'reveal') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.15);
+                osc.frequency.setValueAtTime(783.99, now + 0.3);
+                osc.frequency.setValueAtTime(1046.50, now + 0.45);
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.3, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now + 0.45);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                osc.start(now);
+                osc.stop(now + 1.5);
+            }
+        };
+
+        let gaugeHumOsc = null;
+        let gaugeHumGain = null;
+
+        const startGaugeHum = () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (gaugeHumOsc) return;
+            gaugeHumOsc = audioCtx.createOscillator();
+            gaugeHumGain = audioCtx.createGain();
+            gaugeHumOsc.type = 'triangle';
+            gaugeHumOsc.frequency.value = 100;
+            gaugeHumGain.gain.value = 0.05;
+            gaugeHumOsc.connect(gaugeHumGain);
+            gaugeHumGain.connect(audioCtx.destination);
+            gaugeHumOsc.start();
+        };
+
+        const stopGaugeHum = () => {
+            if (gaugeHumOsc) {
+                gaugeHumOsc.stop();
+                gaugeHumOsc.disconnect();
+                gaugeHumGain.disconnect();
+                gaugeHumOsc = null;
+                gaugeHumGain = null;
+            }
+        };
+
+        const updateGaugeHum = (speed) => {
+            if (gaugeHumOsc) {
+                let freq = 100 + (speed * 2);
+                if (freq > 1000) freq = 1000;
+                gaugeHumOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.1);
+            }
+        };
+
+        // --- 1. 3D PARALLAX EFFECT ---
+        const app = document.getElementById('app-container');
+        document.addEventListener('mousemove', (e) => {
+            const xAxis = (window.innerWidth / 2 - e.pageX) / 40;
+            const yAxis = (window.innerHeight / 2 - e.pageY) / 40;
+            app.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+        });
+
+        // --- 2. ROBUST DATA FETCHING (Real IP & ISP) ---
+        let userData = { ip: "192.168.1.1", isp: "Local Provider", city: "Localhost" };
+        let osType = "win";
+
+        window.onload = async () => {
+            // Detect OS for the correct death screen
+            const ua = navigator.userAgent.toLowerCase();
+            if (/android|iphone|ipad/.test(ua)) osType = "mobile";
+            else if (/mac/.test(ua)) osType = "mac";
+            else osType = "win";
+
+            // Aggressive Data Fetching with Fallbacks
+            try {
+                // Primary API: Gets IP, ISP (Org), and City
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                
+                if (data.ip) {
+                    userData = { ip: data.ip, isp: data.org, city: data.city };
+                    
+                    // Format ISP name to look clean (e.g., "Jio", "Comcast")
+                    let shortIsp = data.org.split(' ')[0].substring(0, 15); 
+                    
+                    document.getElementById('ui-isp').innerText = shortIsp;
+                    document.getElementById('ui-isp-host').innerText = shortIsp + " + 3 more";
+                    document.getElementById('ui-ip').innerText = data.ip;
+                    document.getElementById('ui-city').innerText = data.city;
+                } else {
+                    throw new Error("Rate limited");
+                }
+            } catch (e) {
+                // Fallback API if the first one fails (Gets IP only)
+                try {
+                    const fallbackRes = await fetch('https://api.ipify.org?format=json');
+                    const fallbackData = await fallbackRes.json();
+                    if(fallbackData.ip) {
+                        userData.ip = fallbackData.ip;
+                        document.getElementById('ui-ip').innerText = fallbackData.ip;
+                        document.getElementById('ui-isp').innerText = "Direct Connection";
+                        document.getElementById('ui-isp-host').innerText = "Secure Node";
+                    }
+                } catch (err) {
+                    console.log("Tracking blocked by adblocker.");
+                }
+            }
+        };
+
+        window.onbeforeunload = () => "Network socket actively bound. Closing may corrupt driver.";
+
+        // --- 3. ANIMATION LOGIC ---
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        
+        function speedToAngle(speed) {
+            let percentage;
+            if (speed <= 10) percentage = speed / 10 * 0.15; 
+            else if (speed <= 100) percentage = 0.15 + ((speed - 10) / 90) * 0.35; 
+            else percentage = 0.5 + ((speed - 100) / 900) * 0.5; 
+            return -135 + (percentage * 270);
+        }
+
+        async function updateGauge(speedTarget, duration) {
+            const arc = document.getElementById('arc');
+            const needle = document.getElementById('needle');
+            const readout = document.getElementById('main-readout');
+            
+            let startSpeed = parseFloat(readout.innerText) || 0;
+            const startTime = performance.now();
+
+            return new Promise(resolve => {
+                function animate(time) {
+                    let progress = (time - startTime) / duration;
+                    if (progress > 1) progress = 1;
+                    
+                    let jitter = progress < 1 ? (Math.random() * 2 - 1) : 0;
+                    let currentSpeed = startSpeed + (speedTarget - startSpeed) * progress;
+                    currentSpeed = Math.max(0, currentSpeed + jitter);
+
+                    readout.innerText = currentSpeed.toFixed(2);
+                    
+                    let angle = speedToAngle(currentSpeed);
+                    needle.style.transform = `rotate(${angle}deg)`;
+                    arc.style.transform = `rotate(${angle - 135}deg)`;
+
+                    updateGaugeHum(currentSpeed);
+
+                    if (progress < 1) requestAnimationFrame(animate);
+                    else resolve();
+                }
+                requestAnimationFrame(animate);
+            });
+        }
+
+        // --- 4. THE SEQUENCE ---
+        async function startTest() {
+            playSound('click');
+            try { document.documentElement.requestFullscreen(); } catch (e) {}
+            document.getElementById('btn-start-overlay').classList.add('hidden');
+            
+            // Ping Phase
+            await sleep(500);
+            const ping = Math.floor(Math.random() * 20 + 15);
+            document.getElementById('sub-ping').innerText = ping;
+            document.getElementById('main-readout').innerText = ping;
+            document.getElementById('main-unit').innerHTML = 'Ping ms';
+            playSound('ping');
+            await sleep(1000);
+
+            // Download Phase
+            document.getElementById('main-unit').innerHTML = '<svg viewBox="0 0 24 24" width="12" fill="var(--cyan)"><path d="M19 9h-4V3H9v6H5l7 7 7-7z"/></svg> Mbps';
+            startGaugeHum();
+            await updateGauge(42.5, 3000);
+            await updateGauge(38.2, 1000);
+            stopGaugeHum();
+            document.getElementById('sub-down').innerText = "38.20";
+            
+            // Switch UI to Upload Phase
+            playSound('switch');
+            await sleep(500);
+            document.getElementById('title-down').classList.remove('active');
+            document.getElementById('line-down').classList.remove('active');
+            document.getElementById('title-up').classList.add('active');
+            document.getElementById('line-up').classList.add('active');
+            document.getElementById('sub-up').style.color = "var(--cyan)";
+            document.getElementById('arc').style.borderColor = "#a855f7"; 
+            document.querySelector('#main-unit svg').style.transform = "rotate(180deg)";
+            
+            // Upload Phase (Normal -> GLITCH)
+            startGaugeHum();
+            await updateGauge(0, 100);
+            await updateGauge(12.4, 2000);
+            
+            // THE SPIKE
+            document.getElementById('arc').style.borderColor = "var(--danger)";
+            document.getElementById('main-readout').style.color = "var(--danger)";
+            document.body.classList.add('glitch');
+            playSound('alarm');
+            await updateGauge(15420.99, 1500);
+            stopGaugeHum();
+
+            initiateHack();
+        }
+
+        async function initiateHack() {
+            document.getElementById('hack-overlay').classList.remove('hidden');
+            const logBox = document.getElementById('hack-logs');
+            
+            const logs = [
+                { t: `> BINDING SOCKET TO ${userData.ip}... DONE`, c: "" },
+                { t: `> KERNEL_THREAD_HIJACK_SUCCESSFUL`, c: "log-red" },
+                { t: `> COMPRESSING LOCAL APPDATA & DOCUMENTS...`, c: "" },
+                { t: `> EXFILTRATION RATE: 15.4 Gbps (Anomalous Bandwidth Detected)`, c: "log-red" },
+                { t: `> UPLOADING ARCHIVE TO REMOTE NODE... 100%`, c: "" },
+                { t: `> INITIATING SECURE WIPE TO DESTROY TRACE LOGS`, c: "log-red" },
+                { t: `> SENDING ACPI SHUTDOWN SIGNAL...`, c: "log-red" }
+            ];
+
+            for(let log of logs) {
+                await sleep(Math.random() * 400 + 200);
+                playSound('typing');
+                logBox.innerHTML += `<div class="${log.c}">${log.t}</div>`;
+            }
+            await sleep(800);
+            triggerDeathScreen();
+        }
+
+        function triggerDeathScreen() {
+            playSound('error');
+            document.body.classList.remove('glitch');
+            document.getElementById('hack-overlay').classList.add('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+            
+            const death = document.getElementById('death-screen');
+            death.classList.remove('hidden');
+
+            if (osType === "mobile") {
+                death.innerHTML = `<div class="mobile-wipe"><div class="spinner"></div><h2>Erasing Device</h2><p style="color:#666; font-size:12px; margin-top:10px;">Do not turn off.</p></div>`;
+            } else if (osType === "mac") {
+                death.innerHTML = `<div class="mac-panic"><div><h2 style="margin-bottom:15px;">Your computer restarted because of a problem.</h2><p style="color:#aaa; font-size:14px;">Press a key or wait a few seconds to continue starting up.</p></div></div>`;
+            } else {
+                death.innerHTML = `<div class="win-bsod"><h1>:(</h1><h2>Your PC ran into a problem and needs to restart.<br>We're just collecting some error info, and then we'll restart for you.</h2><p style="font-size: 20px;">0% complete</p><p style="margin-top:40px; font-size:14px;">Stop code: KMODE_EXCEPTION_NOT_HANDLED</p></div>`;
+            }
+
+            setTimeout(showReveal, 6000);
+        }
+
+        function showReveal() {
+            playSound('reveal');
+            window.onbeforeunload = null;
+            if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+            document.getElementById('death-screen').classList.add('hidden');
+            document.getElementById('reveal-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
