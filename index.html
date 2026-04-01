@@ -220,6 +220,94 @@
     </div>
 
    <script>
+        // --- SOUND ---
+        let audioCtx;
+        let ambientOsc = null, ambientGain = null;
+        let tickInterval = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function tone(freq = 440, duration = 0.1, type = 'sine', volume = 0.03) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(volume, audioCtx.currentTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration + 0.02);
+        }
+
+        function noiseBurst(duration = 0.15, volume = 0.04) {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            const source = audioCtx.createBufferSource();
+            const filter = audioCtx.createBiquadFilter();
+            const gain = audioCtx.createGain();
+
+            filter.type = 'highpass';
+            filter.frequency.value = 1200;
+
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+            source.buffer = buffer;
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            source.start();
+        }
+
+        function startAmbient() {
+            if (!audioCtx || ambientOsc) return;
+            ambientOsc = audioCtx.createOscillator();
+            ambientGain = audioCtx.createGain();
+            ambientOsc.type = 'sawtooth';
+            ambientOsc.frequency.setValueAtTime(55, audioCtx.currentTime);
+            ambientGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+            ambientGain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            ambientOsc.connect(ambientGain);
+            ambientGain.connect(audioCtx.destination);
+            ambientOsc.start();
+        }
+
+        function stopAmbient() {
+            if (!audioCtx || !ambientOsc) return;
+            ambientGain.gain.cancelScheduledValues(audioCtx.currentTime);
+            ambientGain.gain.setValueAtTime(ambientGain.gain.value, audioCtx.currentTime);
+            ambientGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.3);
+            ambientOsc.stop(audioCtx.currentTime + 0.35);
+            ambientOsc = null;
+            ambientGain = null;
+        }
+
+        function startTicks() {
+            stopTicks();
+            tickInterval = setInterval(() => {
+                tone(900 + Math.random() * 300, 0.03, 'square', 0.01);
+            }, 90);
+        }
+
+        function stopTicks() {
+            if (tickInterval) {
+                clearInterval(tickInterval);
+                tickInterval = null;
+            }
+        }
+
         // --- 1. 3D PARALLAX EFFECT ---
         const app = document.getElementById('app-container');
         document.addEventListener('mousemove', (e) => {
@@ -311,6 +399,12 @@
                     needle.style.transform = `rotate(${angle}deg)`;
                     arc.style.transform = `rotate(${angle - 135}deg)`;
 
+                    if (audioCtx && ambientOsc) {
+                        const clamped = Math.min(currentSpeed, 16000);
+                        ambientOsc.frequency.setValueAtTime(55 + clamped * 0.08, audioCtx.currentTime);
+                        ambientGain.gain.setValueAtTime(Math.min(0.03, 0.005 + clamped / 800000), audioCtx.currentTime);
+                    }
+
                     if (progress < 1) requestAnimationFrame(animate);
                     else resolve();
                 }
@@ -320,11 +414,14 @@
 
         // --- 4. THE SEQUENCE ---
         async function startTest() {
+            initAudio();
+            tone(520, 0.12, 'sine', 0.03);
             try { document.documentElement.requestFullscreen(); } catch (e) {}
             document.getElementById('btn-start-overlay').classList.add('hidden');
             
             // Ping Phase
             await sleep(500);
+            tone(660, 0.08, 'triangle', 0.025);
             const ping = Math.floor(Math.random() * 20 + 15);
             document.getElementById('sub-ping').innerText = ping;
             document.getElementById('main-readout').innerText = ping;
@@ -333,9 +430,12 @@
 
             // Download Phase
             document.getElementById('main-unit').innerHTML = '<svg viewBox="0 0 24 24" width="12" fill="var(--cyan)"><path d="M19 9h-4V3H9v6H5l7 7 7-7z"/></svg> Mbps';
+            startAmbient();
+            startTicks();
             await updateGauge(42.5, 3000);
             await updateGauge(38.2, 1000);
             document.getElementById('sub-down').innerText = "38.20";
+            tone(740, 0.12, 'triangle', 0.02);
             
             // Switch UI to Upload Phase
             await sleep(500);
@@ -346,6 +446,7 @@
             document.getElementById('sub-up').style.color = "var(--cyan)";
             document.getElementById('arc').style.borderColor = "#a855f7"; 
             document.querySelector('#main-unit svg').style.transform = "rotate(180deg)";
+            tone(480, 0.1, 'square', 0.02);
             
             // Upload Phase (Normal -> GLITCH)
             await updateGauge(0, 100);
@@ -355,6 +456,9 @@
             document.getElementById('arc').style.borderColor = "var(--danger)";
             document.getElementById('main-readout').style.color = "var(--danger)";
             document.body.classList.add('glitch');
+            noiseBurst(0.25, 0.05);
+            tone(120, 0.3, 'sawtooth', 0.035);
+            tone(80, 1.2, 'square', 0.02);
             await updateGauge(15420.99, 1500);
 
             initiateHack();
@@ -377,12 +481,18 @@
             for(let log of logs) {
                 await sleep(Math.random() * 400 + 200);
                 logBox.innerHTML += `<div class="${log.c}">${log.t}</div>`;
+                tone(log.c === "log-red" ? 220 : 880, 0.05, log.c === "log-red" ? 'sawtooth' : 'square', 0.02);
             }
             await sleep(800);
             triggerDeathScreen();
         }
 
         function triggerDeathScreen() {
+            stopTicks();
+            stopAmbient();
+            noiseBurst(0.35, 0.06);
+            tone(60, 1.5, 'sawtooth', 0.04);
+
             document.body.classList.remove('glitch');
             document.getElementById('hack-overlay').classList.add('hidden');
             document.getElementById('app-container').classList.add('hidden');
@@ -406,6 +516,8 @@
             if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
             document.getElementById('death-screen').classList.add('hidden');
             document.getElementById('reveal-screen').classList.remove('hidden');
+            tone(880, 0.12, 'triangle', 0.03);
+            setTimeout(() => tone(1175, 0.18, 'triangle', 0.03), 140);
         }
     </script>
 </body>
